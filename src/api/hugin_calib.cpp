@@ -27,6 +27,11 @@
 #include <panodata/StandardImageVariableGroups.h>
 #include <panotools/PanoToolsOptimizerWrapper.h>
 #include <algorithms/optimizer/PTOptimizer.h>
+#include <lines/FindLines.h>
+#include <vigra/impex.hxx>
+#include <vigra_ext/impexalpha.hxx>
+#include <vigra/functorexpression.hxx>
+#include <vigra_ext/utils.h>
 
 using namespace HuginBase;
 
@@ -50,8 +55,13 @@ struct hugin_calib_handle_t
     // 每张图像的优化变量 (空 = 使用默认)
     std::vector<std::set<std::string>> opt_vars;
 
-    // 控制点
-    std::vector<std::array<double, 6>> cps; // img1 x1 y1 img2 x2 y2
+    // 控制点: img1 x1 y1 img2 x2 y2 [type]
+    std::vector<std::array<double, 7>> cps; // type: 0=X_Y, 1=垂直线, 2=水平线
+
+    // linefind
+    bool linefind_enabled = false;
+    std::string imgdir = ".";
+    int nrLines = 5;
 
     // 结果
     bool ran = false;
@@ -73,6 +83,62 @@ static void set_error(hugin_calib_handle *h, const std::string &msg)
 static bool valid_handle(const hugin_calib_handle *h)
 {
     return h != nullptr;
+}
+
+// ------------------------------------------------------------------
+// linefind helper (与 driver 一致)
+// ------------------------------------------------------------------
+
+static std::string findImagePath(const std::string& dir, int i)
+{
+    for (const char* ext : {".png", ".jpg", ".jpeg"})
+    {
+        std::string p = dir + "/camera_" + std::to_string(i) + ext;
+        std::ifstream f(p.c_str());
+        if (f.good()) return p;
+    }
+    return "";
+}
+
+static std::string findImageName(const std::string& dir, int i)
+{
+    std::string p = findImagePath(dir, i);
+    if (!p.empty())
+    {
+        size_t pos = p.find_last_of('/');
+        return (pos == std::string::npos) ? p : p.substr(pos + 1);
+    }
+    return "camera_" + std::to_string(i) + ".jpg";
+}
+
+static vigra::BImage loadGrayImage(vigra::ImageImportInfo& info, vigra::BImage& mask)
+{
+    vigra::BImage image(info.width(), info.height());
+    if (info.numExtraBands() == 1)
+    {
+        mask.resize(info.width(), info.height());
+        vigra::importImageAlpha(info, vigra::destImage(image), vigra::destImage(mask));
+    }
+    else
+    {
+        vigra::importImage(info, vigra::destImage(image));
+    }
+    return image;
+}
+
+static vigra::UInt8RGBImage loadColorImage(vigra::ImageImportInfo& info, vigra::BImage& mask)
+{
+    vigra::UInt8RGBImage image(info.width(), info.height());
+    if (info.numExtraBands() == 1)
+    {
+        mask.resize(info.width(), info.height());
+        vigra::importImageAlpha(info, vigra::destImage(image), vigra::destImage(mask));
+    }
+    else
+    {
+        vigra::importImage(info, vigra::destImage(image));
+    }
+    return image;
 }
 
 // 计算 RMS 重投影误差 (px)
@@ -210,7 +276,33 @@ extern "C" int hugin_calib_add_cp(hugin_calib_handle *h,
         set_error(h, "control point image index out of range");
         return HUGIN_CALIB_ERR_INVALID;
     }
-    h->cps.push_back({(double)img1, x1, y1, (double)img2, x2, y2});
+    h->cps.push_back({(double)img1, x1, y1, (double)img2, x2, y2, 0.0});
+    return HUGIN_CALIB_OK;
+}
+
+extern "C" int hugin_calib_add_cp_line(hugin_calib_handle *h,
+                                        int img, double x1, double y1,
+                                        double x2, double y2)
+{
+    if (!valid_handle(h)) return HUGIN_CALIB_ERR_NULL;
+    if (h->num_images == 0) { set_error(h, "call set_images first"); return HUGIN_CALIB_ERR_INVALID; }
+    if (img < 0 || img >= h->num_images)
+    {
+        set_error(h, "image index out of range");
+        return HUGIN_CALIB_ERR_INVALID;
+    }
+    h->cps.push_back({(double)img, x1, y1, (double)img, x2, y2, 1.0});
+    return HUGIN_CALIB_OK;
+}
+
+extern "C" int hugin_calib_enable_linefind(hugin_calib_handle *h,
+                                            const char *imgdir, int lines)
+{
+    if (!valid_handle(h)) return HUGIN_CALIB_ERR_NULL;
+    if (lines < 1) { set_error(h, "lines must be >= 1"); return HUGIN_CALIB_ERR_INVALID; }
+    h->linefind_enabled = true;
+    h->imgdir = imgdir ? imgdir : ".";
+    h->nrLines = lines;
     return HUGIN_CALIB_OK;
 }
 
@@ -230,9 +322,11 @@ extern "C" int hugin_calib_load_cp_file(hugin_calib_handle *h,
         std::istringstream s2(line);
         unsigned int i1, i2;
         double x1, y1, x2, y2;
+        int t = 0;
         if (!(s2 >> i1 >> x1 >> y1 >> i2 >> x2 >> y2)) continue;
+        s2 >> t; // 可选: 0=X_Y, 1=垂直线, 2=水平线
         if (i1 >= (unsigned)h->num_images || i2 >= (unsigned)h->num_images) continue;
-        h->cps.push_back({(double)i1, x1, y1, (double)i2, x2, y2});
+        h->cps.push_back({(double)i1, x1, y1, (double)i2, x2, y2, (double)t});
         ++ncp;
     }
     if (ncp == 0) { set_error(h, "no valid control points in file"); return HUGIN_CALIB_ERR_NO_CP; }
@@ -259,6 +353,8 @@ extern "C" int hugin_calib_run(hugin_calib_handle *h)
     const bool doAuto = (h->flags & HUGIN_CALIB_FLAG_AUTO) != 0;
     const bool fixLens = (h->flags & HUGIN_CALIB_FLAG_FIX_LENS) != 0;
     const bool doDistribute = (h->flags & HUGIN_CALIB_FLAG_DISTRIBUTE) != 0;
+    const bool doLinefind = (h->flags & HUGIN_CALIB_FLAG_LINEFIND) != 0;
+    const bool doSmart = (h->flags & HUGIN_CALIB_FLAG_SMART) != 0;
 
     // ---- 1. 构建 panorama ----
     Panorama pano;
@@ -313,7 +409,7 @@ extern "C" int hugin_calib_run(hugin_calib_handle *h)
         img.setPitch(initPose[i][1]);
         img.setRoll(initPose[i][2]);
         img.setCropFactor(h->crop);
-        img.setFilename("camera_" + std::to_string(i) + ".jpg");
+        img.setFilename(findImageName(h->imgdir, i));
         pano.addImage(img);
     }
 
@@ -335,9 +431,39 @@ extern "C" int hugin_calib_run(hugin_calib_handle *h)
     // ---- 3. 加载控制点 ----
     for (const auto &cp : h->cps)
     {
+        int mode = ControlPoint::X_Y;
+        if (cp[6] == 1) mode = ControlPoint::X;   // 垂直线 (t1)
+        else if (cp[6] == 2) mode = ControlPoint::Y; // 水平线 (t2)
         pano.addCtrlPoint(ControlPoint((unsigned)cp[0], cp[1], cp[2],
-                                       (unsigned)cp[3], cp[4], cp[5],
-                                       ControlPoint::X_Y));
+                                       (unsigned)cp[3], cp[4], cp[5], mode));
+    }
+
+    // ---- 3b. linefind: 自动检测竖直线 (约束 roll/pitch) ----
+    if (doLinefind && h->linefind_enabled)
+    {
+        for (int i = 0; i < N; ++i)
+        {
+            std::string fpath = findImagePath(h->imgdir, i);
+            if (fpath.empty()) continue;
+            try
+            {
+                vigra::ImageImportInfo info(fpath.c_str());
+                vigra::BImage mask;
+                HuginBase::CPVector lines;
+                if (info.isGrayscale())
+                {
+                    vigra::BImage image = loadGrayImage(info, mask);
+                    lines = HuginLines::GetVerticalLines(pano, i, image, mask, h->nrLines);
+                }
+                else
+                {
+                    vigra::UInt8RGBImage image = loadColorImage(info, mask);
+                    lines = HuginLines::GetVerticalLines(pano, i, image, mask, h->nrLines);
+                }
+                for (auto &cp : lines) pano.addCtrlPoint(cp);
+            }
+            catch (...) { /* 忽略无法处理的图像 */ }
+        }
     }
 
     // ---- 4. 设置优化变量 ----
@@ -373,11 +499,21 @@ extern "C" int hugin_calib_run(hugin_calib_handle *h)
 
     // ---- 5. 运行优化器 ----
     unsigned int ret;
-    if (doAuto)
+    if (doSmart)
     {
-        AutoOptimise::autoOptimise(pano, true);
+        // Hugin 助手 "Align" (autooptimiser -a): SmartOptimise
+        // AutoOptimise + 全局姿态 + 镜头标定 (FOV>=150 时优化 v/a/b/c/d/e)
+        SmartOptimise::smartOptimize(pano);
+        ret = 0;
     }
-    ret = PTools::optimize(pano);
+    else
+    {
+        if (doAuto)
+        {
+            AutoOptimise::autoOptimise(pano, true);
+        }
+        ret = PTools::optimize(pano);
+    }
     if (ret != 0)
     {
         set_error(h, "PTools::optimize failed (ret=" + std::to_string(ret) + ")");
@@ -488,5 +624,5 @@ extern "C" double hugin_calib_calc_hfov(double focal_mm, double crop_factor,
 
 extern "C" const char *hugin_calib_version(void)
 {
-    return "1.0.0";
+    return "1.1.0";
 }

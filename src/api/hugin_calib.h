@@ -73,7 +73,14 @@ enum hugin_calib_flags {
     /** 固定镜头参数, 不优化 v/a/b/c (只优化姿态 y/p/r) */
     HUGIN_CALIB_FLAG_FIX_LENS   = 1 << 1,
     /** 自动均匀分布初始 yaw (对应 Hugin GUI DistributeImagesCmd) */
-    HUGIN_CALIB_FLAG_DISTRIBUTE = 1 << 2
+    HUGIN_CALIB_FLAG_DISTRIBUTE = 1 << 2,
+    /** 启用垂直线检测 (linefind): 自动检测每图竖直线并加为 t1 控制点,
+     *  约束 roll/pitch。需先调用 hugin_calib_enable_linefind 设置图片目录。 */
+    HUGIN_CALIB_FLAG_LINEFIND   = 1 << 3,
+    /** 智能优化 (对应 Hugin 助手 autooptimiser -a / SmartOptimise):
+     *  AutoOptimise + 全局姿态 + 镜头标定, 全景 FOV>=150 时自动优化
+     *  v/a/b/c/d/e (会改变 HFOV)。推荐与 LINEFIND 一起用。 */
+    HUGIN_CALIB_FLAG_SMART      = 1 << 4
 };
 
 /** 返回码 */
@@ -193,6 +200,25 @@ HUGIN_CALIB_API int hugin_calib_set_optimize_vars(hugin_calib_handle *h,
 HUGIN_CALIB_API int hugin_calib_add_cp(hugin_calib_handle *h,
                                        int img1, double x1, double y1,
                                        int img2, double x2, double y2);
+
+/** 添加一个单图内垂直线控制点 (t1, 约束 roll/pitch)。
+ *  也可由 hugin_calib_enable_linefind 自动生成。
+ *  @param img 图像编号 (0-based)
+ *  @param x1,y1 线起点, x2,y2 线终点 (px)
+ *  @return hugin_calib_status
+ */
+HUGIN_CALIB_API int hugin_calib_add_cp_line(hugin_calib_handle *h,
+                                            int img, double x1, double y1,
+                                            double x2, double y2);
+
+/** 启用垂直线检测 (配合 HUGIN_CALIB_FLAG_LINEFIND 使用)。
+ *  在 run() 时对每张图像检测竖直线 (门框/柱子/建筑边缘等), 自动添加为 t1 控制点。
+ *  @param imgdir 图片所在目录 (包含 camera_0.png/.jpg 等), 可为 NULL 表示当前目录
+ *  @param lines  每图最多检测线条数 (>0, 建议 5)
+ *  @return hugin_calib_status
+ */
+HUGIN_CALIB_API int hugin_calib_enable_linefind(hugin_calib_handle *h,
+                                                const char *imgdir, int lines);
 
 /** 从文件加载控制点, 每行 "img1 x1 y1 img2 x2 y2", '#' 开头行忽略。
  *  @return hugin_calib_status

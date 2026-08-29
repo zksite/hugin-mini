@@ -1,6 +1,7 @@
 # 构建产物
 build/
 dist/
+*.zip
 
 # 临时文件
 *.o

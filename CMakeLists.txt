@@ -47,6 +47,20 @@ add_library(huginbase STATIC
   src/hugin_base/panotools/PanoToolsInterface.cpp
   src/hugin_base/panotools/PanoToolsOptimizerWrapper.cpp
   src/hugin_base/algorithms/basic/CalculateOverlap.cpp
+  src/hugin_base/algorithms/basic/CalculateCPStatistics.cpp
+  src/hugin_base/algorithms/basic/LayerStacks.cpp
+  src/hugin_base/algorithms/nona/CalculateFOV.cpp
+  src/hugin_base/algorithms/nona/CenterHorizontally.cpp
+  src/hugin_base/algorithms/nona/ComputeImageROI.cpp
+  src/hugin_base/algorithms/basic/RotatePanorama.cpp
+  src/hugin_base/algorithms/basic/CalculateOptimalROI.cpp
+  src/hugin_base/algorithms/nona/FitPanorama.cpp
+  src/hugin_base/lines/FindLines.cpp
+  src/hugin_base/lines/FindN8Lines.cpp
+  src/hugin_base/nona/StitcherOptions.cpp
+  src/hugin_base/vigra_ext/emor.cpp
+  src/hugin_base/gpu_stubs.cpp
+  src/hugin_base/appbase/ProgressDisplay.cpp
   src/hugin_base/hugin_math/hugin_math.cpp
   src/hugin_base/hugin_math/Matrix3.cpp
   src/hugin_base/hugin_math/Vector3.cpp

@@ -99,6 +99,7 @@ fi
 # ---- 8. 复制文档 ----
 cp -f "$SCRIPT_DIR/README.md" "$DIST_DIR/README.md" 2>/dev/null || true
 cp -f "$SCRIPT_DIR/HUGIN_GUI_ALIGNMENT.md" "$DIST_DIR/HUGIN_GUI_ALIGNMENT.md" 2>/dev/null || true
+cp -f "$SCRIPT_DIR/LINEFIND_SMART_GUIDE.md" "$DIST_DIR/LINEFIND_SMART_GUIDE.md" 2>/dev/null || true
 
 echo ""
 echo "==> 打包完成: $DIST_DIR"

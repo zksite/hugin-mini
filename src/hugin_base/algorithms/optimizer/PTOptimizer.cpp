@@ -388,8 +388,11 @@ void AutoOptimise::autoOptimise(PanoramaData& pano, bool optRoll)
 }
 
 
-#if 0  // SmartOptimise needs CalculateCPStatisticsRadial/CenterHorizontally/CalculateFOV/getHDRStacks
-      // which are not part of the minimal build; AutoOptimise does not need it.
+// SmartOptimise is needed to replicate the Hugin assistant "Align" step
+// (autooptimiser -a), which optimizes HFOV (v) and lens distortion (a/b/c/d/e)
+// when the panorama FOV >= 150 deg. All dependencies
+// (CalculateCPStatisticsRadial/CenterHorizontally/CalculateFOV/getHDRStacks)
+// are now part of the build, so this is enabled.
 void SmartOptimise::smartOptimize(PanoramaData& optPano)
 {
     // use m-estimator with sigma 2
@@ -573,7 +576,7 @@ void SmartOptimise::smartOptimize(PanoramaData& optPano)
     opts.huberSigma = oldSigma;
     optPano.setOptions(opts);
 }
-#endif  // SmartOptimise
+// end SmartOptimise
 
 OptimizeVector SmartOptimizerStub::createOptVars(const PanoramaData& optPano, int mode, unsigned anchorImg)
 {
