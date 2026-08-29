@@ -61,7 +61,7 @@ struct hugin_calib_handle_t
     // linefind
     bool linefind_enabled = false;
     std::string imgdir = ".";
-    int nrLines = 5;
+    int nrLines = 10;
 
     // 结果
     bool ran = false;

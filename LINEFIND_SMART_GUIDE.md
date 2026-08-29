@@ -35,7 +35,7 @@
     --images 3 \
     --cp cp.txt \                          # 棋盘控制点 (img1 x1 y1 img2 x2 y2)
     --imgdir /path/to/images \             # 图片目录 (camera_0.png/.jpg ...)
-    --linefind --lines 5 \                 # 自动检测垂直线，每图最多 5 条
+    --linefind --lines 10 \                 # 自动检测垂直线，每图最多 10 条
     --smart \                              # SmartOptimise（自动标定 v/a/b/c/d/e）
     --out result.pto
 ```
@@ -48,7 +48,7 @@
 | `--crop C` | **crop factor，必须与相机一致**（否则垂直线检测失败） | 1.0 |
 | `--imgdir DIR` | 图片目录，自动匹配 `camera_<i>.png/.jpg/.jpeg` | `.` |
 | `--linefind` | 检测每图竖直线并加为 t1 控制点 | 关 |
-| `--lines N` | 每图最多检测线条数 | 5 |
+| `--lines N` | 每图最多检测线条数 | 10 |
 | `--smart` | SmartOptimise（内部含 AutoOptimise + 镜头标定） | 关 |
 
 ### 与旧参数的配合
@@ -78,7 +78,7 @@ enum hugin_calib_flags {
 /** 启用垂直线检测（配合 HUGIN_CALIB_FLAG_LINEFIND） */
 int hugin_calib_enable_linefind(hugin_calib_handle *h,
                                 const char *imgdir,  // 图片目录，可为 NULL
-                                int lines);          // 每图最多条数（建议 5）
+                                int lines);          // 每图最多条数（建议 10）
 
 /** 手动添加单图内垂直线控制点（t1） */
 int hugin_calib_add_cp_line(hugin_calib_handle *h,

@@ -137,7 +137,7 @@ static void usage(const char* prog)
         "                    t1 (vertical line) control points to constrain roll,\n"
         "                    like the Hugin assistant 'linefind' step. Needs the\n"
         "                    actual image files. Combine with --smart.\n"
-        "  --lines N         max vertical lines per image for --linefind (default 5)\n"
+        "  --lines N         max vertical lines per image for --linefind (default 10)\n"
         "  --imgdir DIR      directory containing camera_<i>.png/.jpg for --linefind\n"
         "                    (default '.', filename written to pto is auto-detected)\n"
         "  --out FILE        output pto filename (default calib_result.pto)\n";
@@ -150,7 +150,7 @@ int main(int argc, char** argv)
     std::string cpFile, outFile = "calib_result.pto", initFile;
     bool doAuto = false, fixLens = false, doDistribute = false, doSmart = false, doLinefind = false;
     bool doAll = false, doPano = false;
-    int nrLines = 5;
+    int nrLines = 10;
     std::string imgdir = ".";
     // variables to optimize: [0] for image 0, [1] for the others
     std::set<std::string> optLens = {"v","a","b","c"};

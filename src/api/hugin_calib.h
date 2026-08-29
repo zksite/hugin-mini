@@ -216,7 +216,7 @@ HUGIN_CALIB_API int hugin_calib_add_cp_line(hugin_calib_handle *h,
 /** 启用垂直线检测 (配合 HUGIN_CALIB_FLAG_LINEFIND 使用)。
  *  在 run() 时对每张图像检测竖直线 (门框/柱子/建筑边缘等), 自动添加为 t1 控制点。
  *  @param imgdir 图片所在目录 (包含 camera_0.png/.jpg 等), 可为 NULL 表示当前目录
- *  @param lines  每图最多检测线条数 (>0, 建议 5)
+ *  @param lines  每图最多检测线条数 (>0, 建议 10)
  *  @return hugin_calib_status
  */
 HUGIN_CALIB_API int hugin_calib_enable_linefind(hugin_calib_handle *h,
