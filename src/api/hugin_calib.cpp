@@ -63,6 +63,9 @@ struct hugin_calib_handle_t
     std::string imgdir = ".";
     int nrLines = 10;
 
+    // 每张图检测到的垂线数量 (linefind)
+    std::vector<int> line_counts;
+
     // 结果
     bool ran = false;
     double rms_error = 0.0;
@@ -194,6 +197,7 @@ extern "C" int hugin_calib_set_images(hugin_calib_handle *h,
     h->init_pose.assign(num_images, {0.0, 0.0, 0.0});
     h->opt_vars.assign(num_images, {});
     h->cps.clear();
+    h->line_counts.assign(num_images, 0);
     h->ran = false;
     h->results.clear();
     h->last_error.clear();
@@ -350,6 +354,7 @@ extern "C" int hugin_calib_run(hugin_calib_handle *h)
     if (h->cps.empty()) { set_error(h, "no control points added"); return HUGIN_CALIB_ERR_NO_CP; }
 
     const int N = h->num_images;
+    h->line_counts.assign(N, 0);   // 每次 run 重置垂线统计
     const bool doAuto = (h->flags & HUGIN_CALIB_FLAG_AUTO) != 0;
     const bool fixLens = (h->flags & HUGIN_CALIB_FLAG_FIX_LENS) != 0;
     const bool doDistribute = (h->flags & HUGIN_CALIB_FLAG_DISTRIBUTE) != 0;
@@ -460,6 +465,7 @@ extern "C" int hugin_calib_run(hugin_calib_handle *h)
                     vigra::UInt8RGBImage image = loadColorImage(info, mask);
                     lines = HuginLines::GetVerticalLines(pano, i, image, mask, h->nrLines);
                 }
+                h->line_counts[i] = (int)lines.size();
                 for (auto &cp : lines) pano.addCtrlPoint(cp);
             }
             catch (...) { /* 忽略无法处理的图像 */ }
@@ -540,6 +546,7 @@ extern "C" int hugin_calib_run(hugin_calib_handle *h)
         r.yaw = im.getVar("y");
         r.pitch = im.getVar("p");
         r.roll = im.getVar("r");
+        r.num_lines = (i < (int)h->line_counts.size()) ? h->line_counts[i] : 0;
         std::strncpy(r.filename, im.getFilename().c_str(), sizeof(r.filename) - 1);
         h->results.push_back(r);
     }
@@ -628,5 +635,5 @@ extern "C" double hugin_calib_calc_hfov(double focal_mm, double crop_factor,
 
 extern "C" const char *hugin_calib_version(void)
 {
-    return "1.1.0";
+    return "1.2.0";
 }

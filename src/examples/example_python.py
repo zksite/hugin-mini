@@ -61,9 +61,12 @@ def main():
             ("a", ctypes.c_double),
             ("b", ctypes.c_double),
             ("c", ctypes.c_double),
+            ("d", ctypes.c_double),
+            ("e", ctypes.c_double),
             ("yaw", ctypes.c_double),
             ("pitch", ctypes.c_double),
             ("roll", ctypes.c_double),
+            ("num_lines", ctypes.c_int),
             ("filename", ctypes.c_char * 256),
         ]
 
@@ -124,7 +127,8 @@ def main():
     for i in range(result.num_images):
         im = result.images[i]
         print(f"cam{i}: v={im.v:.6f} a={im.a:.6f} b={im.b:.6f} c={im.c:.6f} "
-              f"y={im.yaw:.6f} p={im.pitch:.6f} r={im.roll:.6f}")
+              f"d={im.d:.4f} e={im.e:.4f} "
+              f"y={im.yaw:.6f} p={im.pitch:.6f} r={im.roll:.6f} lines={im.num_lines}")
 
     ctypes.CDLL(None).free(result.images)  # 释放库分配的内存
 

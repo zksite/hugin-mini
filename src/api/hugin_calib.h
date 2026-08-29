@@ -117,6 +117,7 @@ typedef struct hugin_calib_image_result {
     double yaw;        /**< 偏航角 (度) */
     double pitch;      /**< 俯仰角 (度) */
     double roll;       /**< 翻滚角 (度) */
+    int    num_lines;  /**< 该图检测到的垂直线数量 (linefind 启用时为实际检出数, 否则 0) */
     char   filename[256]; /**< 图像文件名 */
 } hugin_calib_image_result;
 

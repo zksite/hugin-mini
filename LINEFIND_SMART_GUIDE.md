@@ -1,6 +1,6 @@
 # linefind（垂直线检测）与 Smart 优化 使用指南
 
-**版本**: 1.1.0 | **日期**: 2026-08-29
+**版本**: 1.2.0 | **日期**: 2026-08-29
 
 本文档说明 hugin_min 新增的两项能力：
 
@@ -103,7 +103,7 @@ int main() {
     hugin_calib_load_cp_file(h, "cp.txt");
 
     // 3. 启用垂直线检测 + 智能优化
-    hugin_calib_enable_linefind(h, "/path/to/images", 5);
+    hugin_calib_enable_linefind(h, "/path/to/images", 10);
     hugin_calib_set_flags(h, HUGIN_CALIB_FLAG_LINEFIND | HUGIN_CALIB_FLAG_SMART);
 
     // 4. 运行
@@ -137,12 +137,34 @@ lib.hugin_calib_write_pto.argtypes = [ctypes.c_void_p, ctypes.c_char_p]
 h = lib.hugin_calib_create()
 lib.hugin_calib_set_images(h, 3840, 2160, 3, 151.013868, 4.85, 3)
 lib.hugin_calib_load_cp_file(h, b"cp.txt")
-lib.hugin_calib_enable_linefind(h, b"/path/to/images", 5)
+lib.hugin_calib_enable_linefind(h, b"/path/to/images", 10)
 lib.hugin_calib_set_flags(h, (1 << 4) | (1 << 3))   # SMART | LINEFIND
 lib.hugin_calib_run(h)
 lib.hugin_calib_write_pto(h, b"result.pto")
 lib.hugin_calib_destroy(h)
 ```
+
+---
+
+### 3.5 读取垂线检出数量 (v1.2.0+)
+
+`hugin_calib_image_result` 新增 `num_lines` 字段，表示**该图实际检测到的垂直线数量**
+（linefind 未启用或图像处理失败时为 0）：
+
+```c
+typedef struct hugin_calib_image_result {
+    ...
+    double roll;        /* 翻滚角 (度) */
+    int    num_lines;   /* 该图检测到的垂直线数量 (linefind 启用时为实际检出数, 否则 0) */
+    char   filename[256];
+} hugin_calib_image_result;
+```
+
+- `hugin_calib_result.images[i].num_lines` 即为第 i 张图找出的垂线数
+- 调用方无需额外 API，`hugin_calib_get_result` 后直接读该字段即可
+
+⚠️ **ABI 注意**：结构体末尾新增字段后，调用方必须使用与本 .so **同版本**的头文件 /
+ctypes 结构体重新编译，否则后续字段会错位（历史教训：旧头 + 新 .so → 姿态字段错位）。
 
 ---
 
@@ -168,7 +190,7 @@ lib.hugin_calib_destroy(h)
   相互间距 ≥ 80px、分布在画面不同位置
 - **crop factor 必须正确**：检测用焦距拟合直线，`crop` 错 → 焦距错 → 检测失败。
   这是最常见的坑（默认 1.0，4 路相机应传 4.85）
-- 检测数量：官方默认每图 5 条，一般 3~10 条即可，不是越多越好
+- 检测数量：默认每图上限 10 条（v1.2.0 从 5 上调），一般 5~10 条即可，不是越多越好
 
 ### Smart 优化
 - 全景 FOV ≥ 150° 时才会自动优化 HFOV (v)；低于则只优化畸变 a/b/c
@@ -185,3 +207,12 @@ lib.hugin_calib_destroy(h)
 - 垂直线只约束 roll/pitch，**不约束 yaw/HFOV**（仍需要棋盘 t0 控制点）
 - 多机共享镜头时所有图像共用一个 v/a/b/c（标准共享镜头标定）
 - 无 OpenGL 的构建中 GPU remap 被禁用（CPU remap），检测速度略慢但结果一致
+
+---
+
+## 7. 版本变更记录
+
+| 版本 | 变更 |
+|---|---|
+| 1.1.0 | 新增 `LINEFIND`/`SMART` 标志、`enable_linefind`/`add_cp_line`、结果含 d/e 主点偏移 |
+| 1.2.0 | ① 垂直线每图上限默认 5→10；② `hugin_calib_image_result` 新增 `num_lines` 字段（每图垂线检出数） |

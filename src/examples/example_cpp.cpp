@@ -75,8 +75,10 @@ int main()
     std::printf("RMS error: %.4f px\n", result.rms_error);
     for (int i = 0; i < result.num_images; ++i) {
         const hugin_calib_image_result *im = &result.images[i];
-        std::printf("cam%d: v=%.6f a=%.6f b=%.6f c=%.6f y=%.6f p=%.6f r=%.6f\n",
-                    i, im->v, im->a, im->b, im->c, im->yaw, im->pitch, im->roll);
+        std::printf("cam%d: v=%.6f a=%.6f b=%.6f c=%.6f d=%.4f e=%.4f "
+                    "y=%.6f p=%.6f r=%.6f lines=%d\n",
+                    i, im->v, im->a, im->b, im->c, im->d, im->e,
+                    im->yaw, im->pitch, im->roll, im->num_lines);
     }
     std::free(result.images);
 
