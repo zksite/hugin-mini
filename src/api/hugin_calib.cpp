@@ -535,6 +535,8 @@ extern "C" int hugin_calib_run(hugin_calib_handle *h)
         r.a = im.getVar("a");
         r.b = im.getVar("b");
         r.c = im.getVar("c");
+        r.d = im.getVar("d");
+        r.e = im.getVar("e");
         r.yaw = im.getVar("y");
         r.pitch = im.getVar("p");
         r.roll = im.getVar("r");
@@ -588,6 +590,8 @@ extern "C" int hugin_calib_write_pto(const hugin_calib_handle *h,
           << " a" << r.a
           << " b" << r.b
           << " c" << r.c
+          << " d" << r.d
+          << " e" << r.e
           << " y" << r.yaw
           << " p" << r.pitch
           << " r" << r.roll

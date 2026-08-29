@@ -32,6 +32,8 @@
 #include <panodata/StandardImageVariableGroups.h>
 #include <panotools/PanoToolsOptimizerWrapper.h>
 #include <algorithms/optimizer/PTOptimizer.h>
+#include <algorithms/nona/FitPanorama.h>
+#include <algorithms/nona/CalculateFOV.h>
 #include <lines/FindLines.h>
 #include <vigra/impex.hxx>
 #include <vigra_ext/impexalpha.hxx>
@@ -121,6 +123,11 @@ static void usage(const char* prog)
         "                    AutoOptimise + global position + lens calibration:\n"
         "                    optimizes v/a/b/c/d/e when pano FOV >= 150 deg.\n"
         "                    Replicates the Hugin assistant that changed HFOV.\n"
+        "  --all             run OPT_ALL (Everything): optimize y/p/r/v/a/b/c/d/e/g/t\n"
+        "                    together in one global pass (Hugin GUI 'Everything' mode).\n"
+        "  --pano            after optimization, compute the optimal panorama output\n"
+        "                    parameters (equirectangular f1 projection, width/height/HFOV)\n"
+        "                    via CalculateFitPanorama and write them into the p line.\n"
         "  --fix-lens        do not optimize lens variables (v/a/b/c), keep them fixed.\n"
         "                    Use with --auto to replicate Hugin GUI 'Positions (incremental)'\n"
         "  --distribute      auto-distribute initial yaw like Hugin GUI 'DistributeImagesCmd'\n"
@@ -142,6 +149,7 @@ int main(int argc, char** argv)
     double hfov = 150.0, crop = 1.0;
     std::string cpFile, outFile = "calib_result.pto", initFile;
     bool doAuto = false, fixLens = false, doDistribute = false, doSmart = false, doLinefind = false;
+    bool doAll = false, doPano = false;
     int nrLines = 5;
     std::string imgdir = ".";
     // variables to optimize: [0] for image 0, [1] for the others
@@ -166,6 +174,8 @@ int main(int argc, char** argv)
         else if (a == "--init")   initFile = next("--init");
         else if (a == "--auto")   doAuto = true;
         else if (a == "--smart")  doSmart = true;
+        else if (a == "--all")    doAll = true;
+        else if (a == "--pano")   doPano = true;
         else if (a == "--linefind") doLinefind = true;
         else if (a == "--lines")  nrLines = atoi(next("--lines").c_str());
         else if (a == "--imgdir") imgdir = next("--imgdir");
@@ -366,7 +376,23 @@ int main(int argc, char** argv)
 
     // ---- 5. run the optimizer (libpano13 LM inside) ----
     unsigned int ret = 0;
-    if (doSmart)
+    if (doAll)
+    {
+        // Hugin GUI "Everything" (OPT_ALL): all geometric parameters in one pass.
+        // y/p/r + v/a/b/c/d/e/g/t optimized together (shared lens -> linked).
+        std::cout << "running OPT_ALL (Everything) optimization...\n";
+        const int ALL = SmartOptimizerStub::OPT_POS | SmartOptimizerStub::OPT_B
+                      | SmartOptimizerStub::OPT_AC | SmartOptimizerStub::OPT_DE
+                      | SmartOptimizerStub::OPT_HFOV | SmartOptimizerStub::OPT_GT;
+        OptimizeVector optvars = SmartOptimizerStub::createOptVars(
+            pano, ALL, pano.getOptions().optimizeReferenceImage);
+        pano.setOptimizeVector(optvars);
+        ret = PTools::optimize(pano);
+        std::cout << "PTools::optimize returned " << ret
+                  << " (0=ok, 1=parser error, 2=parameter error)\n";
+        if (ret != 0) return 1;
+    }
+    else if (doSmart)
     {
         // Hugin assistant "Align" step (autooptimiser -a): SmartOptimise.
         // = AutoOptimise + global OPT_POS + lens calibration, where lens
@@ -400,6 +426,40 @@ int main(int argc, char** argv)
     std::ofstream o(outFile);
     if (!o) { std::cerr << "cannot write " << outFile << "\n"; return 1; }
     o << "#hugin_optimizeReferenceImage 0\n";
+    if (doPano)
+    {
+        // compute optimal panorama output parameters (equirectangular f1),
+        // like the Hugin fast-preview "Estimate" / "Fit" panel:
+        //   HFOV/VFOV from CalculateFOV (actual image coverage)
+        //   height from CalculateFitPanorama
+        //   width from the equirectangular aspect ratio hfov/vfov
+        HuginBase::PanoramaOptions pOpts = pano.getOptions();
+        pOpts.setProjection(HuginBase::PanoramaOptions::EQUIRECTANGULAR);
+        pano.setOptions(pOpts);
+        hugin_utils::FDiff2D fov = HuginBase::CalculateFOV::calcFOV(pano);
+        double hfov = fov.x;
+        double vfov = fov.y;
+        HuginBase::CalculateFitPanorama fit(pano);
+        fit.run();
+        double height = fit.getResultHeight();
+        HuginBase::PanoramaOptions outOpts = pano.getOptions();
+        outOpts.setProjection(HuginBase::PanoramaOptions::EQUIRECTANGULAR);
+        outOpts.setHFOV(hfov, false);
+        outOpts.setHeight((unsigned)(height + 0.5));
+        // equirectangular aspect: width/height = hfov/vfov
+        double targetWidth = outOpts.getHeight() * (hfov / vfov);
+        outOpts.setWidth((unsigned)(targetWidth + 0.5), false);
+        o << "p f1"
+          << " w" << outOpts.getWidth()
+          << " h" << outOpts.getHeight()
+          << " v" << outOpts.getHFOV()
+          << " n\"TIFF_m c:LZW r:CROP\"\n";
+        std::cout << "pano output: f1 w" << outOpts.getWidth()
+                  << " h" << outOpts.getHeight()
+                  << " v" << outOpts.getHFOV()
+                  << " (HFOV=" << hfov << " VFOV=" << vfov
+                  << " fitHeight=" << height << ")\n";
+    }
     for (int i = 0; i < N; ++i)
     {
         const SrcPanoImage & im = pano.getImage(i);
@@ -410,6 +470,8 @@ int main(int argc, char** argv)
           << " a" << im.getVar("a")
           << " b" << im.getVar("b")
           << " c" << im.getVar("c")
+          << " d" << im.getVar("d")
+          << " e" << im.getVar("e")
           << " y" << im.getVar("y")
           << " p" << im.getVar("p")
           << " r" << im.getVar("r")

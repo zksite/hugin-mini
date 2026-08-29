@@ -112,6 +112,8 @@ typedef struct hugin_calib_image_result {
     double a;          /**< 径向畸变 a */
     double b;          /**< 径向畸变 b */
     double c;          /**< 径向畸变 c */
+    double d;          /**< 主点水平偏移 (px) */
+    double e;          /**< 主点垂直偏移 (px) */
     double yaw;        /**< 偏航角 (度) */
     double pitch;      /**< 俯仰角 (度) */
     double roll;       /**< 翻滚角 (度) */
