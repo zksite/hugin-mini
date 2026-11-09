@@ -588,17 +588,6 @@ cmake --build build -j4
 
 ---
 
-## 贡献者
-
-<a href="https://github.com/zksite/hugin-mini/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=zksite/hugin-mini" alt="hugin-mini 贡献者" />
-</a>
-
-由 [@zksite](https://github.com/zksite) 维护。缺陷报告、翻译、语言绑定、检测器集成都欢迎 ——
-见[贡献](#贡献)。
-
----
-
 ## 版本记录
 
 | 版本 | 变更 |
