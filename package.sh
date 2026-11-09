@@ -20,7 +20,11 @@
 #   │   ├── example_c.c                # 示例源码
 #   │   ├── example_cpp.cpp
 #   │   └── cp_sample.txt              # 示例控制点文件
-#   └── README.md                      # 使用文档
+#   ├── docs/
+#   │   └── README.md                  # 文档索引
+#   ├── README.md                      # 英文主文档
+#   ├── README.zh-CN.md                # 中文主文档
+#   └── LICENSE                        # GPL-2.0
 #
 # 用法:
 #   ./package.sh [build_dir] [dist_dir]
@@ -31,6 +35,9 @@
 #   ./bin/example_c examples/cp_sample.txt result.pto
 # =====================================================================
 set -euo pipefail
+
+# 打包时忽略调用环境的库搜索路径, 否则 ldd 可能把依赖解析到 dist/lib 自身
+unset LD_LIBRARY_PATH 2>/dev/null || true
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BUILD_DIR="${1:-$SCRIPT_DIR/build}"
@@ -66,8 +73,13 @@ copy_dep() {
         path=$(find /usr/lib /lib /opt -name "$soname*" 2>/dev/null | head -1 || true)
     fi
     if [ -n "$path" ] && [ -f "$path" ]; then
-        cp -fL "$path" "$DIST_DIR/lib/$(basename "$path")"
-        echo "    copied $(basename "$path")"
+        local dest="$DIST_DIR/lib/$(basename "$path")"
+        if [ "$(readlink -f "$path")" = "$(readlink -f "$dest")" ]; then
+            echo "    keep $(basename "$path") (already in dist)"
+        else
+            cp -fL "$path" "$dest"
+            echo "    copied $(basename "$path")"
+        fi
     else
         echo "!! 警告: 找不到 $soname"
     fi
@@ -98,8 +110,12 @@ fi
 
 # ---- 8. 复制文档 ----
 cp -f "$SCRIPT_DIR/README.md" "$DIST_DIR/README.md" 2>/dev/null || true
+cp -f "$SCRIPT_DIR/README.zh-CN.md" "$DIST_DIR/README.zh-CN.md" 2>/dev/null || true
+cp -f "$SCRIPT_DIR/LICENSE" "$DIST_DIR/LICENSE" 2>/dev/null || true
 cp -f "$SCRIPT_DIR/HUGIN_GUI_ALIGNMENT.md" "$DIST_DIR/HUGIN_GUI_ALIGNMENT.md" 2>/dev/null || true
 cp -f "$SCRIPT_DIR/LINEFIND_SMART_GUIDE.md" "$DIST_DIR/LINEFIND_SMART_GUIDE.md" 2>/dev/null || true
+mkdir -p "$DIST_DIR/docs"
+cp -f "$SCRIPT_DIR/docs/README.md" "$DIST_DIR/docs/README.md" 2>/dev/null || true
 
 echo ""
 echo "==> 打包完成: $DIST_DIR"
