@@ -605,6 +605,17 @@ reporting optimiser problems.
 
 ---
 
+## Contributors
+
+<a href="https://github.com/zksite/hugin-mini/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=zksite/hugin-mini" alt="Contributors to hugin-mini" />
+</a>
+
+Maintained by [@zksite](https://github.com/zksite). Bug reports, translations, bindings and
+detector integrations are all welcome — see [Contributing](#contributing).
+
+---
+
 ## Changelog
 
 | Version | Changes |
